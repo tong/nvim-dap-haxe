@@ -200,6 +200,62 @@ function M.setup(opts)
 			return files[1]
 		end,
 	})
+
+	-- javascript
+	table.insert(dap.configurations.haxe, {
+		name = "javascript",
+		type = "pwa-node",
+		request = "launch",
+		cwd = M.config.javascript.cwd,
+		stopOnEntry = true,
+		program = function()
+			if M.config.javascript.program and M.config.javascript.program ~= "" then
+				local js_path = vim.fn.expand(M.config.javascript.program)
+				local js_stat = vim.loop.fs_stat(js_path)
+				local map_stat = vim.loop.fs_stat(js_path .. ".map")
+				if js_stat and js_stat.type == "file" and map_stat and map_stat.type == "file" then
+					return js_path
+				else
+					vim.notify(
+						"Configured javascript.program ('"
+							.. js_path
+							.. "') not found or is missing a .map file. Falling back to workspace search.",
+						vim.log.levels.WARN
+					)
+				end
+			end
+			local cwd = vim.fn.getcwd()
+			local all_js_files = vim.fn.globpath(cwd, "**/*.js", false, true)
+			if type(all_js_files) == "string" then
+				if all_js_files == "" then
+					all_js_files = {}
+				else
+					all_js_files = vim.split(all_js_files, "\n")
+				end
+			end
+			local valid_files = {}
+			for _, file in ipairs(all_js_files) do
+				if file ~= "" then
+					local map_stat = vim.loop.fs_stat(file .. ".map")
+					if map_stat and map_stat.type == "file" then
+						table.insert(valid_files, file)
+					end
+				end
+			end
+			if #valid_files == 0 then
+				vim.notify("No .js file with a corresponding .js.map file found in workspace!", vim.log.levels.ERROR)
+				return nil
+			end
+			if #valid_files > 1 then
+				return vim.fn.input("Select .js file to launch: ", valid_files[1], "file")
+			end
+			return valid_files[1]
+		end,
+		sourceMaps = true,
+		sourceMapPathOverrides = {
+			["file:////"] = "/",
+		},
+	})
 end
 
 return M
