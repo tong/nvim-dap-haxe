@@ -11,10 +11,10 @@ local function check_exe(name, version_arg)
 	end
 end
 
-local function isi_plugin_available(plugin, required)
+local function is_plugin_available(plugin, required)
 	required = required or false
-	local is_plugin_available = pcall(require, plugin)
-	if is_plugin_available then
+	local plugin_available = pcall(require, plugin)
+	if plugin_available then
 		health.ok(plugin .. " is available")
 	else
 		if required then
@@ -23,7 +23,7 @@ local function isi_plugin_available(plugin, required)
 			health.warn(plugin .. " is not available")
 		end
 	end
-	return is_plugin_available
+	return plugin_available
 end
 
 function M.check()
@@ -55,10 +55,10 @@ function M.check()
 		health.ok(("hashlink: %s, version: %s"):format(hashlink_ver.path, hashlink_ver.out))
 	end
 
-	M.is_plugin_available("dap", true)
-	M.is_plugin_available("dapui", false)
+	is_plugin_available("dap", true)
+	is_plugin_available("dapui", false)
 
-	M.is_plugin_available("nvim-treesitter", true)
+	is_plugin_available("nvim-treesitter", true)
 	if not require("nvim-treesitter.parsers").haxe then
 		health.error("tree-sitter-haxe is not available")
 	end
