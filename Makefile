@@ -1,7 +1,9 @@
 HASHLINK_DEBUGGER := hashlink-debugger
+HXCPP_DEBUGGER    := hxcpp-debugger
 VSHAXE            := vshaxe
 
 HASHLINK_DEBUGGER_REPO := https://github.com/vshaxe/hashlink-debugger.git
+HXCPP_DEBUGGER_REPO    := https://github.com/vshaxe/hxcpp-debugger.git
 VSHAXE_REPO            := https://github.com/vshaxe/vshaxe.git
 
 ADAPTER_DIR = adapter
@@ -14,6 +16,10 @@ ensure-repos:
 	@if [ ! -d "$(HASHLINK_DEBUGGER)" ]; then \
 		echo "→ Cloning hashlink-debugger..."; \
 		git clone --recurse-submodules $(HASHLINK_DEBUGGER_REPO) $(HASHLINK_DEBUGGER); \
+	fi
+	@if [ ! -d "$(HXCPP_DEBUGGER)" ]; then \
+		echo "→ Cloning hxcpp-debugger..."; \
+		git clone --recurse-submodules $(HXCPP_DEBUGGER_REPO) $(HXCPP_DEBUGGER); \
 	fi
 	@if [ ! -d "$(VSHAXE)" ]; then \
 		echo "→ Cloning vshaxe..."; \
@@ -49,12 +55,26 @@ adapter-hl: $(HASHLINK_DEBUGGER)/adapter.js
 		--exclude="*" \
 		$(HASHLINK_DEBUGGER)/hldebug-wrapper/ $(ADAPTER_DIR)/node_modules/hldebug/
 
+$(HXCPP_DEBUGGER)/bin/adapter.js: ensure-repos
+	cd $(HXCPP_DEBUGGER) && haxe build.hxml -D no-traces
+
+adapter-hxcpp: $(HXCPP_DEBUGGER)/bin/adapter.js
+	mkdir -p $(ADAPTER_DIR)
+	npx esbuild $(HXCPP_DEBUGGER)/bin/adapter.js \
+		--bundle \
+		--platform=node \
+		--outfile=$(ADAPTER_DIR)/hxcpp.js
+
 build: ensure-repos adapter-eval adapter-hl
 
 update:
 	@if [ -d "$(HASHLINK_DEBUGGER)" ]; then \
-		echo "→ Updating HashLink Debugger..."; \
+		echo "→ Updating hashink-debugger..."; \
 		cd $(HASHLINK_DEBUGGER) && git pull --recurse-submodules && npm install; \
+	fi
+	@if [ -d "$(HXCPP_DEBUGGER)" ]; then \
+		echo "→ Updating hxcpp-debugger..."; \
+		cd $(HXCPP_DEBUGGER) && git pull --recurse-submodules && npm install; \
 	fi
 	@if [ -d "$(VSHAXE)" ]; then \
 		echo "→ Updating vshaxe..."; \

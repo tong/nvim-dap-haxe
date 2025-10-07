@@ -1,4 +1,6 @@
 !adapter/node_modules
 hashlink-debugger/
+hxcpp-debugger/
 vshaxe/
+test/
 issue*.md
