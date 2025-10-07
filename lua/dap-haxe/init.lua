@@ -77,6 +77,12 @@ function M.setup(opts)
 		args = { plugin_root .. "/adapter/hl.js" },
 	}
 
+	dap.adapters.hxcpp = {
+		type = "executable",
+		command = "node",
+		args = { plugin_root .. "/adapter/hxcpp.js" },
+	}
+
 	local function get_hxml_cfg(bufnr)
 		bufnr = bufnr or 0
 		local path = vim.api.nvim_buf_get_name(bufnr)
@@ -94,57 +100,56 @@ function M.setup(opts)
 		return cfg
 	end
 
-	dap.configurations.hxml = {
-		{
-			name = "hxml:current",
-			request = "launch",
-			cwd = "${workspaceFolder}",
-			stopOnEntry = false,
-			type = function()
-				local cfg = get_hxml_cfg()
-				return cfg and cfg.type or "haxe_eval"
-			end,
-			program = function()
-				local cfg = get_hxml_cfg()
-				return cfg and cfg.program or "."
-			end,
-			args = function()
-				local cfg = get_hxml_cfg()
-				return cfg and cfg.args or {}
-			end,
-			classPaths = function()
-				local cfg = get_hxml_cfg()
-				return cfg and cfg.classPaths
-			end,
-		},
-	}
+	local hxml_cache = {}
+	local function get_hxml_config_for_launch()
+		if hxml_cache.path and hxml_cache.cfg then
+			return hxml_cache.cfg
+		end
+		local path = vim.fn.input("Path to .hxml: ", "build.hxml", "file")
+		if not path or path == "" then
+			return nil
+		end
+		hxml_cache.path = path
+		hxml_cache.cfg = hxml.config_from_hxml(path)
+		vim.schedule(function()
+			hxml_cache = {}
+		end)
+		return hxml_cache.cfg
+	end
 
 	dap.configurations.haxe = dap.configurations.haxe or {}
+
+	-- table.insert(dap.configurations.haxe, {
+	-- 	name = "hxcpp",
+	-- 	request = "launch",
+	-- 	type = "hxcpp",
+	-- 	cwd = "${workspaceFolder}",
+	-- 	-- classPaths = { "${workspaceFolder}" },
+	-- 	program = "/home/tong/dev/nvim/nvim-dap-haxe/test/out/App-debug",
+	-- 	stopOnEntry = true,
+	-- })
 
 	table.insert(dap.configurations.haxe, {
 		name = "haxe:hxml",
 		request = "launch",
 		cwd = "${workspaceFolder}",
 		type = function()
-			local path = vim.fn.input("Path to .hxml: ", "build.hxml", "file")
-			local cfg = hxml.config_from_hxml(path)
+			local cfg = get_hxml_config_for_launch()
 			if not cfg then
-				vim.notify("Failed to parse HXML: " .. path, vim.log.levels.ERROR)
+				vim.notify("Failed to get HXML config", vim.log.levels.ERROR)
 				return "haxe_eval"
 			end
 			return cfg.type
 		end,
 		program = function()
-			local path = vim.fn.input("Path to .hxml: ", "build.hxml", "file")
-			local cfg = hxml.config_from_hxml(path)
+			local cfg = get_hxml_config_for_launch()
 			if not cfg then
 				return nil
 			end
 			return cfg.program or "."
 		end,
 		args = function()
-			local path = vim.fn.input("Path to .hxml: ", "build.hxml", "file")
-			local cfg = hxml.config_from_hxml(path)
+			local cfg = get_hxml_config_for_launch()
 			if not cfg then
 				return {}
 			end
@@ -153,8 +158,7 @@ function M.setup(opts)
 		stopOnEntry = false,
 		-- For hashlink, add classPaths dynamically if missing
 		classPaths = function()
-			local path = vim.fn.input("Path to .hxml: ", "build.hxml", "file")
-			local cfg = hxml.config_from_hxml(path)
+			local cfg = get_hxml_config_for_launch()
 			if not cfg then
 				return {}
 			end
@@ -256,6 +260,31 @@ function M.setup(opts)
 			["file:////"] = "/",
 		},
 	})
+
+	dap.configurations.hxml = {
+		{
+			name = "hxml:current",
+			request = "launch",
+			cwd = "${workspaceFolder}",
+			stopOnEntry = false,
+			type = function()
+				local cfg = get_hxml_cfg()
+				return cfg and cfg.type or "haxe_eval"
+			end,
+			program = function()
+				local cfg = get_hxml_cfg()
+				return cfg and cfg.program or "."
+			end,
+			args = function()
+				local cfg = get_hxml_cfg()
+				return cfg and cfg.args or {}
+			end,
+			classPaths = function()
+				local cfg = get_hxml_cfg()
+				return cfg and cfg.classPaths
+			end,
+		},
+	}
 end
 
 return M
