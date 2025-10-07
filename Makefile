@@ -64,6 +64,7 @@ adapter-hxcpp: $(HXCPP_DEBUGGER)/bin/adapter.js
 		--bundle \
 		--platform=node \
 		--outfile=$(ADAPTER_DIR)/hxcpp.js
+	terser $(ADAPTER_DIR)/hxcpp.js -o $(ADAPTER_DIR)/hxcpp.js
 
 build: ensure-repos adapter-eval adapter-hl
 
