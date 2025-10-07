@@ -3,7 +3,7 @@ local M = {}
 -- local plugin_root = vim.fn.stdpath("data") .. "/lazy/nvim-dap-haxe"
 local plugin_root = vim.fs.dirname(vim.fs.dirname(vim.fs.dirname(debug.getinfo(1, "S").source:sub(2))))
 
-M.defaults = {
+local defaults = {
 	haxe = {
 		executable = "haxe",
 		env = {},
@@ -60,7 +60,7 @@ function M.get_current_function()
 end
 
 function M.setup(opts)
-	M.config = vim.tbl_deep_extend("force", M.defaults, opts or {})
+	M.config = vim.tbl_deep_extend("force", defaults, opts or {})
 
 	local dap = require("dap")
 	local hxml = require("dap-haxe.hxml")
