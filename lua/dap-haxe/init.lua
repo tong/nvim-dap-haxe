@@ -1,61 +1,6 @@
+local config = require("dap-haxe.config")
+
 local M = {}
-
----@class DapHaxeHaxeConfig
----@field bin string
----@field env table<string, string>
-
----@class DapHaxeAdapterConfig
----@field path string
----@field args_templates? table<string, function>
-
----@class DapHaxeAdaptersConfig
----@field haxe DapHaxeAdapterConfig
----@field hashlink DapHaxeAdapterConfig
----@field hxcpp DapHaxeAdapterConfig
-
----@class DapHaxeJavascriptConfig
----@field program string
-
----@class DapHaxeConfig
----@field haxe DapHaxeHaxeConfig
----@field adapters DapHaxeAdaptersConfig
----@field javascript DapHaxeJavascriptConfig
-
--- local plugin_root = vim.fn.stdpath("data") .. "/lazy/nvim-dap-haxe"
-local plugin_root = vim.fs.dirname(vim.fs.dirname(vim.fs.dirname(debug.getinfo(1, "S").source:sub(2))))
-
----@type DapHaxeConfig
-local defaults = {
-	haxe = {
-		bin = "haxe",
-		env = {},
-	},
-	adapters = {
-		haxe = {
-			path = plugin_root .. "/adapter/eval.js",
-			args_templates = {
-				call = function()
-					local mod = M.get_module_path()
-					local fun = M.get_current_function() or "main"
-					return { "--macro", string.format("'%s.%s()'", mod, fun) }
-				end,
-				run = function()
-					local mod = M.get_module_path()
-					return { "--run", mod }
-				end,
-			},
-		},
-		hashlink = {
-			path = plugin_root .. "/adapter/hl.js",
-		},
-		hxcpp = {
-			path = plugin_root .. "/adapter/hxcpp.js",
-		},
-	},
-	javascript = {
-		program = "",
-	},
-}
 
 function M.get_module_path()
 	local rel = vim.fn.fnamemodify(vim.fn.expand("%:r"), ":.")
@@ -79,12 +24,9 @@ function M.get_current_function()
 	return nil
 end
 
----@type DapHaxeConfig
-M.config = {}
-
 ---@param opts? DapHaxeConfig
 function M.setup(opts)
-	M.config = vim.tbl_deep_extend("force", defaults, opts or {})
+	config.setup(opts)
 
 	local dap = require("dap")
 	local hxml = require("dap-haxe.hxml")
@@ -92,19 +34,19 @@ function M.setup(opts)
 	dap.adapters.haxe = {
 		type = "executable",
 		command = "node",
-		args = { M.config.adapters.haxe.path, "--stdio" },
+		args = { config.adapters.haxe.path, "--stdio" },
 	}
 
 	dap.adapters.hashlink = {
 		type = "executable",
 		command = "node",
-		args = { M.config.adapters.hashlink.path },
+		args = { config.adapters.hashlink.path },
 	}
 
 	dap.adapters.hxcpp = {
 		type = "executable",
 		command = "node",
-		args = { M.config.adapters.hxcpp.path },
+		args = { config.adapters.hxcpp.path },
 	}
 
 	local function get_hxml_cfg(bufnr)
@@ -206,7 +148,7 @@ function M.setup(opts)
 	})
 
 	-- haxe:call / haxe:run
-	for name, template in pairs(M.config.adapters.haxe.args_templates or {}) do
+	for name, template in pairs(config.adapters.haxe.args_templates or {}) do
 		table.insert(dap.configurations.haxe, {
 			name = "haxe:" .. name,
 			type = "haxe",
@@ -215,8 +157,8 @@ function M.setup(opts)
 			-- program = ".", -- dummy file for eval adapter
 			args = template,
 			haxeExecutable = {
-				executable = M.config.haxe.bin,
-				env = M.config.haxe.env,
+				executable = config.haxe.bin,
+				env = config.haxe.env,
 			},
 		})
 	end
@@ -261,8 +203,8 @@ function M.setup(opts)
 		cwd = "${workspaceFolder}",
 		stopOnEntry = true,
 		program = function()
-			if M.config.javascript.program and M.config.javascript.program ~= "" then
-				local js_path = vim.fn.expand(M.config.javascript.program)
+			if config.javascript.program and config.javascript.program ~= "" then
+				local js_path = vim.fn.expand(config.javascript.program)
 				local js_stat = vim.loop.fs_stat(js_path)
 				local map_stat = vim.loop.fs_stat(js_path .. ".map")
 				if js_stat and js_stat.type == "file" and map_stat and map_stat.type == "file" then
