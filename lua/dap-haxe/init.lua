@@ -1,8 +1,30 @@
 local M = {}
 
+---@class DapHaxeHaxeConfig
+---@field bin string
+---@field env table<string, string>
+
+---@class DapHaxeAdapterConfig
+---@field path string
+---@field args_templates? table<string, function>
+
+---@class DapHaxeAdaptersConfig
+---@field haxe DapHaxeAdapterConfig
+---@field hashlink DapHaxeAdapterConfig
+---@field hxcpp DapHaxeAdapterConfig
+
+---@class DapHaxeJavascriptConfig
+---@field program string
+
+---@class DapHaxeConfig
+---@field haxe DapHaxeHaxeConfig
+---@field adapters DapHaxeAdaptersConfig
+---@field javascript DapHaxeJavascriptConfig
+
 -- local plugin_root = vim.fn.stdpath("data") .. "/lazy/nvim-dap-haxe"
 local plugin_root = vim.fs.dirname(vim.fs.dirname(vim.fs.dirname(debug.getinfo(1, "S").source:sub(2))))
 
+---@type DapHaxeConfig
 local defaults = {
 	haxe = {
 		bin = "haxe",
@@ -31,7 +53,7 @@ local defaults = {
 		},
 	},
 	javascript = {
-		program = nil,
+		program = "",
 	},
 }
 
@@ -57,6 +79,10 @@ function M.get_current_function()
 	return nil
 end
 
+---@type DapHaxeConfig
+M.config = {}
+
+---@param opts? DapHaxeConfig
 function M.setup(opts)
 	M.config = vim.tbl_deep_extend("force", defaults, opts or {})
 
