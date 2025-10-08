@@ -5,34 +5,32 @@ local plugin_root = vim.fs.dirname(vim.fs.dirname(vim.fs.dirname(debug.getinfo(1
 
 local defaults = {
 	haxe = {
-		executable = "haxe",
+		bin = "haxe",
 		env = {},
 	},
 	adapters = {
-		eval = {
-			type = "haxe_eval",
-			cwd = "${workspaceFolder}",
-			stopOnEntry = false,
+		haxe = {
+			path = plugin_root .. "/adapter/eval.js",
 			args_templates = {
-				function_call = function()
+				call = function()
 					local mod = M.get_module_path()
-					local fn = M.get_current_function() or "main"
-					return { "--macro", string.format("'%s.%s()'", mod, fn) }
+					local fun = M.get_current_function() or "main"
+					return { "--macro", string.format("'%s.%s()'", mod, fun) }
 				end,
-				run_file = function()
+				run = function()
 					local mod = M.get_module_path()
 					return { "--run", mod }
 				end,
 			},
 		},
 		hashlink = {
-			type = "hashlink",
-			cwd = "${workspaceFolder}",
-			stopOnEntry = false,
+			path = plugin_root .. "/adapter/hl.js",
+		},
+		hxcpp = {
+			path = plugin_root .. "/adapter/hxcpp.js",
 		},
 	},
 	javascript = {
-		cwd = "${workspaceFolder}",
 		program = nil,
 	},
 }
@@ -65,22 +63,22 @@ function M.setup(opts)
 	local dap = require("dap")
 	local hxml = require("dap-haxe.hxml")
 
-	dap.adapters.haxe_eval = {
+	dap.adapters.haxe = {
 		type = "executable",
 		command = "node",
-		args = { plugin_root .. "/adapter/eval.js", "--stdio" },
+		args = { M.config.adapters.haxe.path, "--stdio" },
 	}
 
 	dap.adapters.hashlink = {
 		type = "executable",
 		command = "node",
-		args = { plugin_root .. "/adapter/hl.js" },
+		args = { M.config.adapters.hashlink.path },
 	}
 
 	dap.adapters.hxcpp = {
 		type = "executable",
 		command = "node",
-		args = { plugin_root .. "/adapter/hxcpp.js" },
+		args = { M.config.adapters.hxcpp.path },
 	}
 
 	local function get_hxml_cfg(bufnr)
@@ -119,16 +117,6 @@ function M.setup(opts)
 
 	dap.configurations.haxe = dap.configurations.haxe or {}
 
-	-- table.insert(dap.configurations.haxe, {
-	-- 	name = "hxcpp",
-	-- 	request = "launch",
-	-- 	type = "hxcpp",
-	-- 	cwd = "${workspaceFolder}",
-	-- 	-- classPaths = { "${workspaceFolder}" },
-	-- 	program = "/home/tong/dev/nvim/nvim-dap-haxe/test/out/App-debug",
-	-- 	stopOnEntry = true,
-	-- })
-
 	table.insert(dap.configurations.haxe, {
 		name = "haxe:hxml",
 		request = "launch",
@@ -137,7 +125,7 @@ function M.setup(opts)
 			local cfg = get_hxml_config_for_launch()
 			if not cfg then
 				vim.notify("Failed to get HXML config", vim.log.levels.ERROR)
-				return "haxe_eval"
+				return "haxe"
 			end
 			return cfg.type
 		end,
@@ -155,31 +143,55 @@ function M.setup(opts)
 			end
 			return cfg.args or {}
 		end,
-		stopOnEntry = false,
+		stopOnEntry = function()
+			local cfg = get_hxml_config_for_launch()
+			if cfg and (cfg.type == "pwa-node" or cfg.type == "javascript") then
+				return true
+			end
+			return false
+		end,
 		-- For hashlink, add classPaths dynamically if missing
 		classPaths = function()
 			local cfg = get_hxml_config_for_launch()
 			if not cfg then
 				return {}
 			end
-			if cfg.type == "hashlink" then
+			if cfg.type == "hashlink" and not cfg.classPaths then
 				return { vim.fn.fnamemodify(vim.fn.getcwd(), ":p") }
+			end
+			return cfg.classPaths
+		end,
+		sourceMaps = function()
+			local cfg = get_hxml_config_for_launch()
+			if cfg and (cfg.type == "pwa-node" or cfg.type == "javascript") then
+				return true
+			end
+			return nil
+		end,
+		sourceMapPathOverrides = function()
+			local cfg = get_hxml_config_for_launch()
+			if cfg and (cfg.type == "pwa-node" or cfg.type == "javascript") then
+				return {
+					["file:////"] = "/",
+				}
 			end
 			return nil
 		end,
 	})
 
-	-- eval:function / eval:run
-	for name, template in pairs(M.config.adapters.eval.args_templates or {}) do
+	-- haxe:call / haxe:run
+	for name, template in pairs(M.config.adapters.haxe.args_templates or {}) do
 		table.insert(dap.configurations.haxe, {
-			name = "eval:" .. name,
-			type = M.config.adapters.eval.type,
+			name = "haxe:" .. name,
+			type = "haxe",
 			request = "launch",
-			cwd = M.config.adapters.eval.cwd,
+			cwd = "${workspaceFolder}",
 			-- program = ".", -- dummy file for eval adapter
 			args = template,
-			stopOnEntry = M.config.adapters.eval.stopOnEntry,
-			haxeExecutable = M.config.haxe,
+			haxeExecutable = {
+				executable = M.config.haxe.bin,
+				env = M.config.haxe.env,
+			},
 		})
 	end
 
@@ -205,12 +217,22 @@ function M.setup(opts)
 		end,
 	})
 
+	-- table.insert(dap.configurations.haxe, {
+	-- 	name = "hxcpp",
+	-- 	request = "launch",
+	-- 	type = "hxcpp",
+	-- 	cwd = "${workspaceFolder}",
+	-- 	-- classPaths = { "${workspaceFolder}" },
+	-- 	program = "/home/tong/dev/nvim/nvim-dap-haxe/test/out/App-debug",
+	-- 	stopOnEntry = true,
+	-- })
+
 	-- javascript
 	table.insert(dap.configurations.haxe, {
 		name = "javascript",
 		type = "pwa-node",
 		request = "launch",
-		cwd = M.config.javascript.cwd,
+		cwd = "${workspaceFolder}",
 		stopOnEntry = true,
 		program = function()
 			if M.config.javascript.program and M.config.javascript.program ~= "" then
@@ -230,13 +252,6 @@ function M.setup(opts)
 			end
 			local cwd = vim.fn.getcwd()
 			local all_js_files = vim.fn.globpath(cwd, "**/*.js", false, true)
-			if type(all_js_files) == "string" then
-				if all_js_files == "" then
-					all_js_files = {}
-				else
-					all_js_files = vim.split(all_js_files, "\n")
-				end
-			end
 			local valid_files = {}
 			for _, file in ipairs(all_js_files) do
 				if file ~= "" then
@@ -266,10 +281,16 @@ function M.setup(opts)
 			name = "hxml:current",
 			request = "launch",
 			cwd = "${workspaceFolder}",
-			stopOnEntry = false,
+			stopOnEntry = function()
+				local cfg = get_hxml_cfg()
+				if cfg and (cfg.type == "pwa-node" or cfg.type == "javascript") then
+					return true
+				end
+				return false
+			end,
 			type = function()
 				local cfg = get_hxml_cfg()
-				return cfg and cfg.type or "haxe_eval"
+				return cfg and cfg.type or "haxe"
 			end,
 			program = function()
 				local cfg = get_hxml_cfg()
@@ -282,6 +303,22 @@ function M.setup(opts)
 			classPaths = function()
 				local cfg = get_hxml_cfg()
 				return cfg and cfg.classPaths
+			end,
+			sourceMaps = function()
+				local cfg = get_hxml_cfg()
+				if cfg and (cfg.type == "pwa-node" or cfg.type == "javascript") then
+					return true
+				end
+				return nil
+			end,
+			sourceMapPathOverrides = function()
+				local cfg = get_hxml_cfg()
+				if cfg and (cfg.type == "pwa-node" or cfg.type == "javascript") then
+					return {
+						["file:////"] = "/",
+					}
+				end
+				return nil
 			end,
 		},
 	}
